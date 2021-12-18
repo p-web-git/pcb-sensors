@@ -1,8 +1,7 @@
-import bme680
-from datetime import datetime
-import logging, time
+import logging, time, bme680
+from sensor import Sensor
 
-class BME680:
+class BME680(Sensor):
 	def __init__(self, enableGas=False, skipNGasSamples=0, i2c_device=None):
 		self.enableGas = enableGas
 		self.skipNGasSamples = skipNGasSamples
@@ -21,48 +20,45 @@ class BME680:
 		self.sensor=sensor
 
 	def read(self, dynamic=False):
-		self.date = datetime.utcnow()
+		self.updateDateTime()
 		self.sensor.get_sensor_data()
 		if self.enableGas:
 			time.sleep(1)
 			if self.sensor.data.heat_stable and self.skipNGasSamples > 0:
 					self.skipNGasSamples = self.skipNGasSamples - 1
-
-	def getDateTime(self):
-		return self.date
-
-	def getDateTimeStr(self):
-		return self.getDateTime().isoformat(timespec='seconds').split('+')[0]
-
-	def getTemperature(self):
+	@property
+	def temperature(self):
 		return self.sensor.data.temperature
 
-	def getHumidity(self):
+	@property
+	def humidity(self):
 		return self.sensor.data.humidity
 
-	def getPressure(self):
+	@property
+	def pressure(self):
 		return self.sensor.data.pressure
 
-	def getGasResistance(self):
+	@property
+	def gasResistance(self):
 		if self.enableGas and self.sensor.data.heat_stable and self.skipNGasSamples == 0:
 			return round(self.sensor.data.gas_resistance, 1)
 		else:
 			return None
 
 	def getSummaryInJson(self):
-		j = {'measurement': 'bme680',  'time': self.getDateTimeStr(), 'fields': { }}
+		j = {'measurement': self.name, 'time': self.getDateTimeStr(), 'fields': { }}
 
-		if self.getTemperature() != None:
-			j['fields'].update({'temperature': self.getTemperature()})
+		if self.temperature != None:
+			j['fields'].update({'temperature': self.temperature})
 
-		if self.getHumidity() != None:
-			j['fields'].update({'humidity': self.getHumidity()})
+		if self.humidity != None:
+			j['fields'].update({'humidity': self.humidity})
 
-		if self.getPressure() != None:
-			j['fields'].update({'pressure': self.getPressure()})
+		if self.pressure != None:
+			j['fields'].update({'pressure': self.pressure})
 
-		if self.getGasResistance() != None:
-			j['fields'].update({'gasResistance': self.getGasResistance()})
+		if self.gasResistance != None:
+			j['fields'].update({'gasResistance': self.gasResistance})
 
 		return j
 
@@ -71,14 +67,19 @@ class BME680:
 		self.sensor.soft_reset()
 
 def _main():
+	import time
 	logging.basicConfig(level=logging.DEBUG)
 
 	sensor = BME680(enableGas=False)
-	sensor.read()
-	logging.info(sensor.getSummaryInJson())
-	time.sleep(5)
-	sensor.read()
-	logging.info(sensor.getSummaryInJson())
+
+	try:
+		while True:
+			sensor.read()
+			logging.info(sensor.getSummaryInJson())
+			time.sleep(5)
+	except KeyboardInterrupt:
+		pass
+
 	sensor.close()
 	logging.info("Exit")
 
