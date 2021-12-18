@@ -1,5 +1,4 @@
-import logging, sys, signal, smbus, os
-import sentry_sdk
+import logging, sys, signal, smbus, os, sentry_sdk
 from dotenv import find_dotenv, load_dotenv
 from periodic_thread import RepeatTimer
 from sensorBME680 import BME680
@@ -9,13 +8,10 @@ from mqttClient import mqttClient
 TIME_PERIOD_S = 60
 LIGHT_PERIOD_S = 20
 
-load_dotenv(find_dotenv())
-
 def sensorThread(sensor, client):
 	sensor.read(dynamic=True)
 	dt = sensor.getSummaryInJson()
 	client.sendObj(obj=dt['fields'])
-
 
 def terminate(signum, frame):
 	logging.debug('\nSignal captured...')
@@ -23,6 +19,7 @@ def terminate(signum, frame):
 	lt.cancel()
 
 ## Main Starts Here ##
+load_dotenv(find_dotenv())
 
 sentry_sdk.init(
     os.getenv('SENTRY_SENSORS'),
